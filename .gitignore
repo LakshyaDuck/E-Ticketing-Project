@@ -5,6 +5,7 @@ __pycache__/
 
 # IDE
 .idea/
+cuda-keyring_1.1-1_all.deb.1
 .vscode/
 
 # Env
