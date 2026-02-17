@@ -1,0 +1,18 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# IDE
+.idea/
+.vscode/
+
+# Env
+.env
+
+# Node
+node_modules/
+
+# OS / random files
+*.log
+*.deb
