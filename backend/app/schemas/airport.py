@@ -5,7 +5,7 @@ class AirportBase(BaseModel):
     name: str
     city: str
     country: str
-    code: str
+    iata_code: str
 
 
 class AirportCreate(AirportBase):
@@ -16,7 +16,7 @@ class AirportUpdate(BaseModel):
     name: str | None = None
     city: str | None = None
     country: str | None = None
-    code: str | None = None
+    iata_code: str | None = None
 
 
 class AirportOut(AirportBase):

@@ -9,4 +9,4 @@ class Airport(Base):
     name = Column(String(150), nullable=False)
     city = Column(String(100), nullable=False)
     country = Column(String(100), nullable=False)
-    code = Column(String(10), unique=True, nullable=False)  # e.g., DEL, BOM
+    iata_code = Column(String(3), unique=True, nullable=False, index=True)  # e.g., "JFK"
