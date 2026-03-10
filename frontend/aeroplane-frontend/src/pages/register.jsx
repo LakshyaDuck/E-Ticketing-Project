@@ -3,18 +3,26 @@ import { Registerdata } from "../utility/form-data";
 import Commonelement from "../services/formdata-render";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { authAPI } from "../services/api.js";
 
 function Register() {
   const navigate = useNavigate();
   const [formdata, setformdata] = useState({
     name: "",
+    email: "",
     password: ""
   });
+  const [error, setError] = useState("");
 
-  function buttonhandle(e) {
+  async function buttonhandle(e) {
     e.preventDefault();
-    console.log(formdata);
-    navigate('/login');
+    setError("");
+    try {
+      await authAPI.register(formdata);
+      navigate("/login");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Registration failed. Try again.");
+    }
   }
 
   return (
@@ -38,6 +46,7 @@ function Register() {
         <p className="text-black/50 text-center mb-8 text-sm uppercase tracking-widest">Join Air Link</p>
 
         <form className="flex flex-col space-y-6 items-center" onSubmit={buttonhandle}>
+          {error && <p className="text-red-600 text-sm">{error}</p>}
           <div className="w-full">
             <Commonelement
               data={Registerdata} 

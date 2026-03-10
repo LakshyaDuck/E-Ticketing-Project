@@ -3,15 +3,25 @@ import Commonelement from "../services/formdata-render";
 import Logindata from "../utility/form-data";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
+import { authAPI } from "../services/api.js";
 
 function Login() {
     const [formdata, setformdata] = useState({ name: "", password: "" });
+    const [error, setError] = useState("");
     const navigate = useNavigate();
 
-    function buttonhandle(e) {
+    async function buttonhandle(e) {
         e.preventDefault();
-        console.log(formdata);
-        navigate('/');
+        setError("");
+        try {
+            const res = await authAPI.login(formdata.name, formdata.password);
+            if (res.data?.token) {
+                localStorage.setItem("token", res.data.token);
+                navigate("/");
+            }
+        } catch (err) {
+            setError(err.response?.data?.detail || "Login failed. Try again.");
+        }
     }
 
     return (
@@ -35,6 +45,7 @@ function Login() {
                 <p className="text-black/50 text-center mb-8 text-sm uppercase tracking-widest">Air Link Portal</p>
                 
                 <form className="flex flex-col space-y-6 items-center" onSubmit={buttonhandle}>
+                    {error && <p className="text-red-600 text-sm">{error}</p>}
                     <div className="w-full">
                         <Commonelement 
                             data={Logindata} 
