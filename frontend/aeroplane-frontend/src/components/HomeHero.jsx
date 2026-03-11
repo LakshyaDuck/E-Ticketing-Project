@@ -1,6 +1,8 @@
 import { MapPin, Calendar, Search } from "lucide-react"
+import {useNavigate} from "react-router-dom";
 
 function Firstpageelement() {
+    const navigate = useNavigate();
     return (
         <div className="w-full flex flex-col items-end justify-between p-8 text-white h-full">
 
@@ -52,7 +54,7 @@ function Firstpageelement() {
                     </li>
 
                     <li>
-                        <button className="bg-blue-700 rounded-xl h-12 w-12 flex items-center justify-center hover:bg-blue-800">
+                        <button onClick={()=>navigate("/search")} className="bg-blue-700 rounded-xl h-12 w-12 flex items-center justify-center hover:bg-blue-800">
                             <Search size={24} color="white"/>
                         </button>
                     </li>
