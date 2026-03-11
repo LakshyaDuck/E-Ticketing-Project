@@ -1,180 +1,305 @@
 import { useEffect, useState } from "react"
-import { useSearchParams, useNavigate } from "react-router-dom"
+import { useNavigate, useSearchParams } from "react-router-dom"
 import bg from "../assets/frontpage.png"
 
 function Search() {
-  const [flights, setFlights] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [params, setParams] = useSearchParams()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
 
-  const [searchState, setSearchState] = useState({
-    fromText: "", fromId: params.get("source_airport_id") || "",
-    toText: "", toId: params.get("destination_airport_id") || "",
-    date: params.get("date") || ""
-  })
+  const [allFlights, setAllFlights] = useState([])
+  const [airports, setAirports] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const [suggestions, setSuggestions] = useState({ from: [], to: [] })
-  const [activeField, setActiveField] = useState(null)
+  // Pre-fill from URL params if navigated from HomeHero
+  const [from, setFrom] = useState(searchParams.get("from") || "")
+  const [to, setTo] = useState(searchParams.get("to") || "")
+  const [date, setDate] = useState(searchParams.get("date") || "")
 
-  const fetchAirports = async (query, field) => {
-    if (query.length < 2) return;
-    try {
-      const res = await fetch(`http://localhost:8000/api/v1/airports/search?q=${query}`)
-      const data = await res.json()
-      setSuggestions(prev => ({ ...prev, [field]: data }))
-    } catch (err) { console.error(err) }
-  }
+  const [fromOpen, setFromOpen] = useState(false)
+  const [toOpen, setToOpen] = useState(false)
+
+  // what's actually shown — starts as all, updated on search click
+  const [displayed, setDisplayed] = useState([])
 
   useEffect(() => {
-    const loadFlights = async () => {
-      setLoading(true)
-      const sId = params.get("source_airport_id")
-      const dId = params.get("destination_airport_id")
-      const date = params.get("date")
-
-      let url = `http://localhost:8000/api/v1/flights/search`
-      if (sId && dId && date) {
-        url += `?source_airport_id=${sId}&destination_airport_id=${dId}&date=${date}`
-      }
-
+    const init = async () => {
       try {
-        const res = await fetch(url)
-        const data = await res.json()
-        setFlights(Array.isArray(data) ? data : [])
-      } catch (err) { console.error(err) }
-      finally { setLoading(false) }
-    }
-    loadFlights()
-  }, [params])
+        const today = new Date().toISOString().split("T")[0]
 
-  const handleSearchTrigger = () => {
-    setParams({
-      source_airport_id: searchState.fromId,
-      destination_airport_id: searchState.toId,
-      date: searchState.date
+        const apRes = await fetch("http://localhost:8000/api/v1/airports")
+        const aps = await apRes.json()
+        setAirports(Array.isArray(aps) ? aps : [])
+
+        const routesRes = await fetch("http://localhost:8000/api/v1/routes")
+        const routes = await routesRes.json()
+
+        const flightPromises = routes.map(r => {
+          const origin = aps.find(a => a.id === r.source_airport_id)
+          const dest   = aps.find(a => a.id === r.destination_airport_id)
+          if (!origin || !dest) return Promise.resolve([])
+          return fetch(
+            `http://localhost:8000/api/v1/flights/search?origin_iata=${origin.iata_code}&destination_iata=${dest.iata_code}&date=${today}`
+          ).then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
+        })
+
+        const results = await Promise.all(flightPromises)
+        const unique = Array.from(
+          new Map(results.flat().map(f => [f.id, f])).values()
+        )
+        setAllFlights(unique)
+
+        // If coming from HomeHero with pre-filled params, auto-filter immediately
+        const urlFrom = searchParams.get("from")
+        const urlTo   = searchParams.get("to")
+        const urlDate = searchParams.get("date")
+        if (urlFrom || urlTo || urlDate) {
+          const preFiltered = unique.filter(f => {
+            const matchFrom = !urlFrom || f.origin_iata === urlFrom
+            const matchTo   = !urlTo   || f.destination_iata === urlTo
+            const matchDate = !urlDate || f.departure_time?.startsWith(urlDate)
+            return matchFrom && matchTo && matchDate
+          })
+          setDisplayed(preFiltered)
+        } else {
+          setDisplayed(unique)
+        }
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setLoading(false)
+      }
+    }
+    init()
+  }, [])
+
+  // Dropdown options from loaded flights
+  const fromOptions = [...new Set(allFlights.map(f => f.origin_iata))].map(iata => ({
+    iata,
+    city: airports.find(a => a.iata_code === iata)?.city || iata
+  }))
+
+  const toOptions = [...new Set(allFlights.map(f => f.destination_iata))].map(iata => ({
+    iata,
+    city: airports.find(a => a.iata_code === iata)?.city || iata
+  }))
+
+  // Search button — filter and update displayed
+  const handleSearch = () => {
+    const result = allFlights.filter(f => {
+      const matchFrom = !from || f.origin_iata === from
+      const matchTo   = !to   || f.destination_iata === to
+      const matchDate = !date  || f.departure_time.startsWith(date)
+      return matchFrom && matchTo && matchDate
     })
+    setDisplayed(result)
   }
+
+  const handleClear = () => {
+    setFrom("")
+    setTo("")
+    setDate("")
+    setDisplayed(allFlights)
+  }
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const close = () => { setFromOpen(false); setToOpen(false) }
+    document.addEventListener("click", close)
+    return () => document.removeEventListener("click", close)
+  }, [])
 
   return (
     <div
-      className="min-h-screen bg-cover bg-center bg-fixed flex justify-center p-4 relative"
+      className="h-screen w-screen overflow-hidden bg-cover bg-center flex justify-center items-start p-4 relative"
       style={{ backgroundImage: `url(${bg})` }}
     >
-      {/* 1. DARK OVERLAY: This makes white text readable regardless of the image */}
       <div className="absolute inset-0 bg-black/40 pointer-events-none" />
 
-      <div className="w-full max-w-6xl mt-10 bg-black/20 backdrop-blur-2xl border border-white/20 rounded-[40px] shadow-2xl p-6 md:p-10 flex flex-col h-fit relative z-10">
+      {/* Main card — full height minus padding */}
+      <div className="w-full max-w-6xl h-full bg-black/20 backdrop-blur-2xl border border-white/20 rounded-[40px] shadow-2xl p-6 md:p-8 flex flex-col relative z-10 overflow-hidden mt-4 mb-4">
 
-        {/* Navigation */}
-        <div className="flex flex-col md:flex-row gap-6 items-center mb-10">
+        {/* ── Top bar ── */}
+        <div className="flex flex-col md:flex-row gap-4 items-center mb-6 shrink-0">
+
           <button
             onClick={() => navigate("/")}
-            className="text-white hover:text-blue-300 flex items-center gap-2 font-bold drop-shadow-md transition-colors"
+            className="text-white hover:text-blue-300 flex items-center gap-2 font-bold transition-colors shrink-0"
           >
             <span className="text-2xl">←</span> Home
           </button>
 
-          {/* Functional Search Bar */}
-          <div className="flex-1 w-full bg-black/40 backdrop-blur-3xl border border-white/20 rounded-3xl p-2 flex flex-wrap md:flex-nowrap items-center gap-2 relative shadow-inner">
+          {/* Filter bar */}
+          <div className="flex-1 w-full bg-black/40 border border-white/20 rounded-3xl p-2 flex flex-wrap md:flex-nowrap items-center gap-2">
 
-            {/* Field Template */}
-            {[
-              { label: 'From', key: 'fromText', field: 'from', placeholder: 'Origin...' },
-              { label: 'To', key: 'toText', field: 'to', placeholder: 'Destination...' }
-            ].map((input) => (
-              <div key={input.label} className="flex-1 min-w-[180px] px-4 py-2 border-r border-white/10 relative">
-                <label className="text-[11px] uppercase text-blue-300 font-black tracking-widest drop-shadow-sm">
-                  {input.label}
-                </label>
-                <input
-                  type="text"
-                  value={searchState[input.key]}
-                  onChange={(e) => {
-                    setSearchState({...searchState, [input.key]: e.target.value})
-                    fetchAirports(e.target.value, input.field)
-                    setActiveField(input.field)
-                  }}
-                  placeholder={input.placeholder}
-                  className="bg-transparent text-white w-full outline-none placeholder:text-white/40 font-semibold text-lg"
-                />
-                {activeField === input.field && suggestions[input.field].length > 0 && (
-                  <div className="absolute top-full left-0 w-full bg-slate-900 border border-white/20 z-50 rounded-2xl mt-2 shadow-2xl overflow-hidden">
-                    {suggestions[input.field].map(a => (
-                      <div key={a.id} onClick={() => {
-                        setSearchState({...searchState, [input.key]: `${a.city} (${a.code})`, [input.field + 'Id']: a.id})
-                        setSuggestions({from: [], to: []})
-                      }} className="p-4 hover:bg-blue-600 cursor-pointer text-white border-b border-white/5 transition-colors">
-                        <p className="font-bold">{a.city}</p>
-                        <p className="text-xs opacity-70">{a.name}</p>
-                      </div>
-                    ))}
+            {/* FROM */}
+            <div
+              className="flex-1 min-w-[130px] px-3 py-2 border-r border-white/10 relative"
+              onClick={e => e.stopPropagation()}
+            >
+              <label className="text-[10px] uppercase text-blue-300 font-black tracking-widest block">From</label>
+              <button
+                onClick={() => { setFromOpen(o => !o); setToOpen(false) }}
+                className="w-full text-left text-white font-semibold text-sm outline-none truncate"
+              >
+                {from
+                  ? `${fromOptions.find(o => o.iata === from)?.city} (${from})`
+                  : <span className="text-white/40">Any origin</span>
+                }
+              </button>
+              {fromOpen && fromOptions.length > 0 && (
+                <div className="absolute top-full left-0 w-56 bg-slate-900 border border-white/20 z-50 rounded-2xl mt-2 shadow-2xl overflow-y-auto max-h-48">
+                  <div
+                    onClick={() => { setFrom(""); setFromOpen(false) }}
+                    className="p-3 hover:bg-blue-600 cursor-pointer text-white/50 text-sm border-b border-white/10 transition-colors"
+                  >
+                    All origins
                   </div>
-                )}
-              </div>
-            ))}
+                  {fromOptions.map(o => (
+                    <div
+                      key={o.iata}
+                      onClick={() => { setFrom(o.iata); setFromOpen(false) }}
+                      className="p-3 hover:bg-blue-600 cursor-pointer text-white border-b border-white/5 transition-colors"
+                    >
+                      <p className="font-bold text-sm">{o.city}</p>
+                      <p className="text-xs opacity-60">{o.iata}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-            <div className="flex-1 min-w-[150px] px-4 py-2">
-              <label className="text-[11px] uppercase text-blue-300 font-black tracking-widest">Date</label>
+            {/* TO */}
+            <div
+              className="flex-1 min-w-[130px] px-3 py-2 border-r border-white/10 relative"
+              onClick={e => e.stopPropagation()}
+            >
+              <label className="text-[10px] uppercase text-blue-300 font-black tracking-widest block">To</label>
+              <button
+                onClick={() => { setToOpen(o => !o); setFromOpen(false) }}
+                className="w-full text-left text-white font-semibold text-sm outline-none truncate"
+              >
+                {to
+                  ? `${toOptions.find(o => o.iata === to)?.city} (${to})`
+                  : <span className="text-white/40">Any destination</span>
+                }
+              </button>
+              {toOpen && toOptions.length > 0 && (
+                <div className="absolute top-full left-0 w-56 bg-slate-900 border border-white/20 z-50 rounded-2xl mt-2 shadow-2xl overflow-y-auto max-h-48">
+                  <div
+                    onClick={() => { setTo(""); setToOpen(false) }}
+                    className="p-3 hover:bg-blue-600 cursor-pointer text-white/50 text-sm border-b border-white/10 transition-colors"
+                  >
+                    All destinations
+                  </div>
+                  {toOptions.map(o => (
+                    <div
+                      key={o.iata}
+                      onClick={() => { setTo(o.iata); setToOpen(false) }}
+                      className="p-3 hover:bg-blue-600 cursor-pointer text-white border-b border-white/5 transition-colors"
+                    >
+                      <p className="font-bold text-sm">{o.city}</p>
+                      <p className="text-xs opacity-60">{o.iata}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* DATE */}
+            <div className="flex-1 min-w-[130px] px-3 py-2 border-r border-white/10">
+              <label className="text-[10px] uppercase text-blue-300 font-black tracking-widest block">Date</label>
               <input
-                type="date" value={searchState.date}
-                onChange={(e) => setSearchState({...searchState, date: e.target.value})}
-                className="bg-transparent text-white w-full outline-none font-semibold text-lg [color-scheme:dark]"
+                type="date"
+                value={date}
+                onChange={e => setDate(e.target.value)}
+                className="bg-transparent text-white w-full outline-none font-semibold text-sm [color-scheme:dark]"
               />
             </div>
 
-            <button onClick={handleSearchTrigger} className="bg-blue-600 hover:bg-blue-500 p-4 rounded-2xl shadow-lg shadow-blue-900/50 transition-all active:scale-90">
-              <span className="text-xl">🔍</span>
+            {/* SEARCH button */}
+            <button
+              onClick={handleSearch}
+              className="bg-blue-600 hover:bg-blue-500 active:scale-95 px-5 py-3 rounded-2xl text-white font-black text-sm shadow-lg transition-all shrink-0"
+            >
+              🔍 Search
             </button>
+
+            {/* CLEAR */}
+            {(from || to || date) && (
+              <button
+                onClick={handleClear}
+                className="text-white/50 hover:text-red-400 text-sm px-3 transition-colors shrink-0"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Results Section */}
-        <div className="flex justify-between items-end mb-8 border-b border-white/20 pb-4">
-          <h2 className="text-white text-4xl font-black tracking-tight drop-shadow-lg">
-            {params.get("source_airport_id") ? "Search Results" : "Available Flights"}
+        {/* ── Results header ── */}
+        <div className="flex justify-between items-center mb-4 border-b border-white/20 pb-3 shrink-0">
+          <h2 className="text-white text-2xl font-black tracking-tight">
+            {from || to ? "Filtered Flights" : "All Flights Today"}
           </h2>
-          <span className="text-blue-300 font-mono font-bold bg-blue-900/30 px-3 py-1 rounded-lg">
-            {flights.length} TOTAL
+          <span className="text-blue-300 font-mono font-bold bg-blue-900/30 px-3 py-1 rounded-lg text-sm">
+            {loading ? "loading..." : `${displayed.length} flight${displayed.length !== 1 ? "s" : ""}`}
           </span>
         </div>
 
-        <div className="space-y-4 max-h-[55vh] overflow-y-auto pr-2 custom-scrollbar">
+        {/* ── Flight cards — this is the ONLY scrollable area ── */}
+        <div className="flex-1 overflow-y-auto pr-1 space-y-3 min-h-0">
           {loading ? (
-             <div className="text-white text-center py-20 animate-pulse text-xl font-bold">Scanning Airspace...</div>
-          ) : flights.length > 0 ? (
-            flights.map((f) => (
-              <div key={f.flight_id} className="bg-black/40 hover:bg-black/60 border border-white/10 rounded-3xl p-6 text-white grid grid-cols-1 md:grid-cols-5 gap-4 items-center transition-all group shadow-xl">
+            <div className="text-white text-center py-20 animate-pulse text-xl font-bold">
+              Scanning Airspace...
+            </div>
+          ) : displayed.length > 0 ? (
+            displayed.map(f => (
+              <div
+                key={f.id}
+                className="bg-black/40 hover:bg-black/60 border border-white/10 rounded-3xl p-4 text-white grid grid-cols-1 md:grid-cols-5 gap-3 items-center transition-all shadow-xl"
+              >
+                {/* Airline */}
                 <div className="md:col-span-1">
-                  <p className="text-blue-400 font-black text-xs uppercase tracking-widest mb-1">{f.airline}</p>
-                  <p className="text-xl font-bold text-white drop-shadow-md">#{f.flight_id}</p>
+                  <p className="text-blue-400 font-black text-xs uppercase tracking-widest mb-1">{f.airline_name}</p>
+                  <p className="text-base font-bold">{f.flight_number}</p>
+                  <p className="text-xs text-white/40">{f.aircraft_model}</p>
                 </div>
 
-                <div className="md:col-span-2 flex items-center justify-between px-4">
+                {/* Route */}
+                <div className="md:col-span-2 flex items-center justify-between px-2">
                   <div className="text-center">
-                    <p className="text-2xl font-black">{new Date(f.departure_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                    <p className="text-xs text-white/60 font-bold uppercase">Takeoff</p>
+                    <p className="text-xl font-black">
+                      {new Date(f.departure_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    <p className="text-xs font-bold text-white/70">{f.origin_iata}</p>
+                    <p className="text-xs text-white/40">{f.origin_city}</p>
                   </div>
-                  <div className="flex-1 border-t-2 border-dashed border-white/20 relative mx-6 h-[1px]">
-                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-xl drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]">✈️</span>
+                  <div className="flex-1 mx-3 relative">
+                    <div className="border-t-2 border-dashed border-white/20" />
+                    <span className="absolute -top-3 left-1/2 -translate-x-1/2 text-base">✈️</span>
                   </div>
                   <div className="text-center">
-                    <p className="text-2xl font-black">{new Date(f.arrival_time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                    <p className="text-xs text-white/60 font-bold uppercase">Landing</p>
+                    <p className="text-xl font-black">
+                      {new Date(f.arrival_time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
+                    <p className="text-xs font-bold text-white/70">{f.destination_iata}</p>
+                    <p className="text-xs text-white/40">{f.destination_city}</p>
                   </div>
                 </div>
 
-                <div className="text-center md:text-right">
-                  <p className="text-3xl font-black text-white drop-shadow-md">₹{f.price}</p>
-                  <p className={`text-xs font-bold ${f.seats_available < 10 ? 'text-red-400' : 'text-green-400'}`}>
-                    {f.seats_available} seats left
+                {/* Price + seats */}
+                <div className="text-center">
+                  <p className="text-2xl font-black">${f.base_price_economy}</p>
+                  <p className={`text-xs font-bold mt-1 ${f.available_seats < 10 ? "text-red-400" : "text-green-400"}`}>
+                    {f.available_seats} seats left
                   </p>
                 </div>
 
+                {/* Book */}
                 <div className="flex justify-end">
                   <button
-                    onClick={() => navigate(`/booking/${f.flight_id}`)}
-                    className="w-full md:w-auto bg-blue-600 text-white font-black px-10 py-4 rounded-2xl hover:bg-blue-500 transition-all shadow-lg active:scale-95 uppercase tracking-widest"
+                    onClick={() => navigate(`/booking/${f.id}`)}
+                    className="w-full md:w-auto bg-blue-600 text-white font-black px-6 py-3 rounded-2xl hover:bg-blue-500 transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs"
                   >
                     Select
                   </button>
@@ -183,10 +308,13 @@ function Search() {
             ))
           ) : (
             <div className="text-center py-20 bg-black/20 rounded-3xl border border-dashed border-white/20">
-               <p className="text-white font-bold text-xl drop-shadow-md">No flights currently in the air.</p>
+              <p className="text-5xl mb-4">✈️</p>
+              <p className="text-white font-bold text-xl">No flights match your filters.</p>
+              <p className="text-white/50 mt-2 text-sm">Clear filters to see all available flights.</p>
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

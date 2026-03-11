@@ -1,60 +1,54 @@
 import { Link, useNavigate } from "react-router-dom"
-import { useEffect, useState } from "react"
+import { useState, useEffect } from "react"
 
 function Navbar() {
-
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
   const navigate = useNavigate()
+  const [isLoggedIn, setIsLoggedIn] = useState(!!localStorage.getItem("token"))
 
   useEffect(() => {
-    setIsLoggedIn(!!localStorage.getItem("token"))
-
-    const updateAuth = () => {
-      setIsLoggedIn(!!localStorage.getItem("token"))
-    }
-
-    window.addEventListener("storage", updateAuth)
-
-    return () => window.removeEventListener("storage", updateAuth)
+    const check = () => setIsLoggedIn(!!localStorage.getItem("token"))
+    window.addEventListener("storage", check)
+    return () => window.removeEventListener("storage", check)
   }, [])
 
   const handleLogout = () => {
     localStorage.removeItem("token")
     setIsLoggedIn(false)
-    navigate("/login")
+    navigate("/")
   }
 
   return (
-    <nav className="flex justify-between items-center px-8 py-4 text-white">
-
-      <Link to="/" className="text-lg font-bold">
-        ✈️ Air Link
+    <nav className="flex items-center justify-between text-white w-full">
+      {/* Logo */}
+      <Link to="/" className="font-black text-xl tracking-tight hover:text-blue-300 transition-colors">
+        ✈️ AeroBook
       </Link>
 
-      <ul className="flex gap-6">
-        <li><Link to="/">Home</Link></li>
-        <li><Link to="/about">About</Link></li>
-        <li><Link to="/offer">Offer</Link></li>
-        <li><Link to="/seat">Seat</Link></li>
-        <li><Link to="/destination">Destination</Link></li>
-      </ul>
-
-      {isLoggedIn ? (
-        <button
-          onClick={handleLogout}
-          className="px-6 py-2 bg-white text-blue-600 rounded-full"
-        >
-          Logout
-        </button>
-      ) : (
-        <button
-          onClick={() => navigate("/login")}
-          className="px-6 py-2 bg-white text-blue-600 rounded-full"
-        >
-          Login
-        </button>
-      )}
-
+      {/* Links */}
+      <div className="flex items-center gap-6 text-sm font-semibold">
+        {isLoggedIn ? (
+          <>
+            <Link to="/search" className="text-white/70 hover:text-white transition-colors">Flights</Link>
+            <Link to="/my-bookings" className="text-white/70 hover:text-white transition-colors">My Bookings</Link>
+            <button
+              onClick={handleLogout}
+              className="bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-1.5 rounded-xl transition-all text-white/80 hover:text-white"
+            >
+              Logout
+            </button>
+          </>
+        ) : (
+          <>
+            <Link to="/" className="text-white/70 hover:text-white transition-colors">Home</Link>
+            <Link to="/about" className="text-white/70 hover:text-white transition-colors">About</Link>
+            <Link to="/features" className="text-white/70 hover:text-white transition-colors">Features</Link>
+            <Link to="/login" className="text-white/70 hover:text-white transition-colors">Login</Link>
+            <Link to="/register" className="bg-blue-600 hover:bg-blue-500 px-4 py-1.5 rounded-xl transition-all text-white shadow">
+              Register
+            </Link>
+          </>
+        )}
+      </div>
     </nav>
   )
 }

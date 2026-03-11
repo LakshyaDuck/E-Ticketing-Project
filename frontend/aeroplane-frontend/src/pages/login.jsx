@@ -12,10 +12,9 @@ function Login() {
     setError('');
     try {
       const { data } = await authAPI.login(formdata.username, formdata.password);
-      navigate("/");
-      localStorage.setItem('token', data.access_token);
+      localStorage.setItem('token', data.access_token);   // ✅ save FIRST
       window.dispatchEvent(new Event('storage'));
-      // window.location.href = '/';
+      navigate("/");                                        // ✅ navigate AFTER
     } catch (err) {
       setError('Invalid credentials');
     }
