@@ -22,15 +22,16 @@ function Search() {
   const [displayed, setDisplayed] = useState([])
 
   useEffect(() => {
+    const BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000';
     const init = async () => {
       try {
         const today = new Date().toISOString().split("T")[0]
 
-        const apRes = await fetch("http://localhost:8000/api/v1/airports")
+        const apRes = await fetch(`${BASE}/api/v1/airports`)
         const aps = await apRes.json()
         setAirports(Array.isArray(aps) ? aps : [])
 
-        const routesRes = await fetch("http://localhost:8000/api/v1/routes")
+        const routesRes = await fetch(`${BASE}/api/v1/routes`)
         const routes = await routesRes.json()
 
         const flightPromises = routes.map(r => {
@@ -38,7 +39,7 @@ function Search() {
           const dest   = aps.find(a => a.id === r.destination_airport_id)
           if (!origin || !dest) return Promise.resolve([])
           return fetch(
-            `http://localhost:8000/api/v1/flights/search?origin_iata=${origin.iata_code}&destination_iata=${dest.iata_code}&date=${today}`
+            `${BASE}/api/v1/flights/search?origin_iata=${origin.iata_code}&destination_iata=${dest.iata_code}&date=${today}`
           ).then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
         })
 
