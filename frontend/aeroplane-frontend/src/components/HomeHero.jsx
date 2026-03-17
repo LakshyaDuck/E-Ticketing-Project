@@ -79,7 +79,7 @@ function Firstpageelement() {
   const [to, setTo] = useState("")
 
   useEffect(() => {
-    api.get("/airports").then(res => setAirports(res.data)).catch(() => {})
+    api.get("/airports/").then(res => setAirports(res.data)).catch(() => {})
   }, [])
 
   const handleSearch = () => {
