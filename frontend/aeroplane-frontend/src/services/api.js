@@ -34,7 +34,7 @@ export const flightAPI = {
 
 export const bookingAPI = {
   create: (data) => api.post('/bookings/with-payment', data),
-  getMyBookings: () => api.get('/bookings'),
+  getMyBookings: () => api.get('/bookings/'),
 };
 
 export default api;
