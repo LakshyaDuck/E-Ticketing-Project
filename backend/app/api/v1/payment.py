@@ -225,7 +225,6 @@ async def refund_payment(  # ← CHANGED to async
         payment_status="refunded",
         metadata={"refund_transaction_id": refund_result.transaction_id}
     )
-    await log_payment_event(...)
 
     # Send cancellation email
     await send_cancellation_email(
@@ -236,6 +235,5 @@ async def refund_payment(  # ← CHANGED to async
         currency=payment.currency
     )
 
-    await manager.broadcast_to_flight(...)
     
     return payment
