@@ -256,7 +256,6 @@ async def create_booking_with_payment(  # ← CHANGED to async
         }
     )
 
-    await log_booking_event(...)
 
     # Send confirmation email
     flight = booking.flight
@@ -273,11 +272,6 @@ async def create_booking_with_payment(  # ← CHANGED to async
         total_amount=float(data.total_amount),
         currency=data.currency
     )
-
-    await manager.broadcast_to_flight(...)
-
-    # Broadcast WebSocket
-    await manager.broadcast_to_flight(...)
     
     return {
         "booking": booking,
