@@ -22,10 +22,9 @@ function Search() {
   const [displayed, setDisplayed] = useState([])
 
   useEffect(() => {
-    const BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000';
     const init = async () => {
       try {
-        const today = new Date().toISOString().split("T")[0]
+        const BASE = import.meta.env.VITE_API_URL?.replace('/api/v1', '') || 'http://localhost:8000'
 
         const apRes = await fetch(`${BASE}/api/v1/airports/`)
         const aps = await apRes.json()
@@ -34,13 +33,21 @@ function Search() {
         const routesRes = await fetch(`${BASE}/api/v1/routes/`)
         const routes = await routesRes.json()
 
-        const flightPromises = routes.map(r => {
+        // Fetch flights for next 7 days so results don't expire daily
+        const dates = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date()
+          d.setDate(d.getDate() + i)
+          return d.toISOString().split("T")[0]
+        })
+
+        const flightPromises = routes.flatMap(r => {
           const origin = aps.find(a => a.id === r.source_airport_id)
           const dest   = aps.find(a => a.id === r.destination_airport_id)
-          if (!origin || !dest) return Promise.resolve([])
-          return fetch(
-            `${BASE}/api/v1/flights/search?origin_iata=${origin.iata_code}&destination_iata=${dest.iata_code}&date=${today}`
-          ).then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
+          if (!origin || !dest) return []
+          return dates.map(date =>
+            fetch(`${BASE}/api/v1/flights/search?origin_iata=${origin.iata_code}&destination_iata=${dest.iata_code}&date=${date}`)
+              .then(r => r.json()).then(d => Array.isArray(d) ? d : []).catch(() => [])
+          )
         })
 
         const results = await Promise.all(flightPromises)
@@ -299,7 +306,7 @@ function Search() {
                 {/* Book */}
                 <div className="flex justify-end">
                   <button
-                    onClick={() => navigate(`/booking/${f.id}`, { state: { price: f.base_price_economy } })}
+                    onClick={() => navigate(`/booking/${f.id}`)}
                     className="w-full md:w-auto bg-blue-600 text-white font-black px-6 py-3 rounded-2xl hover:bg-blue-500 transition-all shadow-lg active:scale-95 uppercase tracking-widest text-xs"
                   >
                     Select

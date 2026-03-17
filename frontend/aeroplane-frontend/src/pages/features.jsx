@@ -35,7 +35,7 @@ function Features() {
           {features.map(f => (
             <div key={f.title} className="bg-white/10 hover:bg-white/15 border border-white/10 rounded-2xl p-4 transition-all">
               <p className="text-2xl mb-2">{f.icon}</p>
-              <h3 className="font-black text-sm mb-1">{f.title}</h3>
+              <h3 className="font-black   text-sm mb-1">{f.title}</h3>
               <p className="text-white/55 text-xs leading-relaxed">{f.desc}</p>
             </div>
           ))}
