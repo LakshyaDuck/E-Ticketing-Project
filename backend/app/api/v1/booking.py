@@ -110,7 +110,28 @@ def list_my_bookings(
         current_user=Depends(get_current_user),
 ):
     """Get all bookings for current user"""
-    return db.query(Booking).filter(Booking.user_id == current_user.id).all()
+    bookings = db.query(Booking).filter(Booking.user_id == current_user.id).all()
+    results = []
+    for b in bookings:
+        flight = b.flight
+        results.append({
+            "id": b.id,
+            "booking_reference": b.booking_reference,
+            "ticket_number": b.ticket_number,
+            "flight_id": b.flight_id,
+            "seat_number": b.seat_number,
+            "passenger_name": b.passenger_name,
+            "passenger_email": b.passenger_email,
+            "total_amount": float(b.total_amount),
+            "status": b.status,
+            "booking_time": b.booking_time,
+            "issued_time": b.issued_time,
+            "origin_iata": flight.route.source_airport.iata_code if flight else None,
+            "destination_iata": flight.route.destination_airport.iata_code if flight else None,
+            "flight_number": flight.flight_number if flight else None,
+            "airline_name": flight.airline.name if flight else None,
+        })
+    return results
 
 
 @router.get("/{booking_id}", response_model=BookingOut)
